@@ -28,9 +28,35 @@ function parseProspects(rows) {
 }
 
 function parseMarketNotes(rows) {
-  const headerIndex = rows.findIndex((row) => row[0] === 'Date' && row[1] === 'Category');
-  if (headerIndex < 0) return [];
-  return rows.slice(headerIndex + 1).filter(nonEmpty).map((row) => ({ date: row[0] || '', category: row[1] || '', note: row[2] || '', source: row[3] || '' }));
+  // Case-insensitive, trimmed header search — handles variations like "date", "DATE", " Date ", etc.
+  const headerIndex = rows.findIndex((row) => {
+    const cells = row.map((c) => String(c).trim().toLowerCase());
+    return (
+      cells.some((c) => c === 'date') &&
+      (cells.some((c) => c === 'category' || c === 'type') || cells.some((c) => c.includes('note')))
+    );
+  });
+
+  if (headerIndex < 0) {
+    // Fallback: no recognised header — treat every non-empty row with >=2 filled cells as a note
+    return rows.filter(nonEmpty).filter((row) => row.filter((c) => String(c).trim()).length >= 2)
+      .map((row) => ({ date: row[0] || '', category: '', note: row[1] || '', source: row[2] || '' }));
+  }
+
+  const headers = rows[headerIndex].map((c) => String(c).trim().toLowerCase());
+  const col = (name) => headers.findIndex((h) => h === name || h.includes(name));
+
+  const dateCol = col('date');
+  const categoryCol = col('category') >= 0 ? col('category') : col('type');
+  const noteCol = col('note');   // matches 'note' or 'notes'
+  const sourceCol = col('source');
+
+  return rows.slice(headerIndex + 1).filter(nonEmpty).map((row) => ({
+    date: (dateCol >= 0 ? row[dateCol] : '') || '',
+    category: (categoryCol >= 0 ? row[categoryCol] : '') || '',
+    note: (noteCol >= 0 ? row[noteCol] : row[2]) || '',
+    source: (sourceCol >= 0 ? row[sourceCol] : '') || '',
+  })).filter((n) => n.note || n.category);
 }
 
 function parseUpworkSignals(rows) {
@@ -331,14 +357,41 @@ function App() {
   }, [pipelineProspects]);
 
   const sizeDistribution = useMemo(() => {
+    // Predefined buckets in ascending order
+    const SIZE_BUCKETS = [
+      { label: '1–10 employees', min: 1, max: 10 },
+      { label: '11–50 employees', min: 11, max: 50 },
+      { label: '51–200 employees', min: 51, max: 200 },
+      { label: '201–500 employees', min: 201, max: 500 },
+      { label: '501–1,000 employees', min: 501, max: 1000 },
+      { label: '1,000+ employees', min: 1001, max: Infinity },
+    ];
+
+    function normalizeToBucket(rawSize) {
+      if (!rawSize || rawSize === '—') return 'Not Specified';
+      // Extract the first number from the string (handles "201-500", "8,500+", "~50", "1,000–5,000", etc.)
+      const cleaned = String(rawSize).replace(/,/g, '');
+      const match = cleaned.match(/\d+/);
+      if (!match) return 'Not Specified';
+      const num = parseInt(match[0], 10);
+      const bucket = SIZE_BUCKETS.find((b) => num >= b.min && num <= b.max);
+      return bucket ? bucket.label : 'Not Specified';
+    }
+
     const counts = {};
     pipelineProspects.forEach((p) => {
-      const size = p['Size (rough)'] || '—';
-      counts[size] = (counts[size] || 0) + 1;
+      const bucket = normalizeToBucket(p['Size (rough)']);
+      counts[bucket] = (counts[bucket] || 0) + 1;
     });
-    return Object.entries(counts)
-      .map(([size, count]) => ({ size, count }))
-      .sort((a, b) => b.count - a.count);
+
+    // Return in defined bucket order, then append 'Not Specified' at the end
+    const ordered = SIZE_BUCKETS
+      .filter((b) => counts[b.label])
+      .map((b) => ({ size: b.label, count: counts[b.label] }));
+    if (counts['Not Specified']) {
+      ordered.push({ size: 'Not Specified', count: counts['Not Specified'] });
+    }
+    return ordered;
   }, [pipelineProspects]);
 
   const executiveInsights = useMemo(() => {
