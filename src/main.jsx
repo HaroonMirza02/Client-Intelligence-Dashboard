@@ -362,7 +362,7 @@ function App() {
       const percentage = Math.round((topSrc.count / total) * 100);
       insights.push({
         type: 'info',
-        text: `📈 ${topSrc.source} is your primary channel, driving ${topSrc.count} leads (${percentage}% of total pipeline).`
+        text: `${topSrc.source} is your primary channel, driving ${topSrc.count} leads (${percentage}% of total pipeline).`
       });
     }
 
@@ -370,7 +370,7 @@ function App() {
       const topInd = topIndustries[0];
       insights.push({
         type: 'success',
-        text: `🎯 Highest industry concentration found in "${topInd.industry}" (${topInd.count} companies).`
+        text: `Highest industry concentration found in "${topInd.industry}" (${topInd.count} companies).`
       });
     }
 
@@ -379,7 +379,7 @@ function App() {
     if (clientPct < 15) {
       insights.push({
         type: 'alert',
-        text: `💡 Conversion rate from pipeline to Client is currently ${clientPct}%. Focus on transitioning In-discussion leads.`
+        text: `Conversion rate from pipeline to Client is currently ${clientPct}%. Focus on transitioning In-discussion leads.`
       });
     }
 
