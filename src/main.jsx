@@ -72,8 +72,6 @@ function parseUpworkSignals(rows) {
 
 const label = (value) => value === '—' ? '' : value;
 const statusClass = (value) => `status ${String(value).toLowerCase().replace(/[^a-z]+/g, '-')}`;
-const isCompetitiveReference = (prospect) => /not a real sales prospect|competitive reference/i.test(prospect.Notes || '');
-
 function getIndustries(industryStr) {
   if (!industryStr || industryStr === '—') return [];
 
@@ -306,7 +304,7 @@ function App() {
 
   useEffect(() => { refresh(); }, [refresh]);
   const prospects = data?.prospects || [];
-  const pipelineProspects = useMemo(() => prospects.filter((prospect) => !isCompetitiveReference(prospect)), [prospects]);
+  const pipelineProspects = prospects;
   const statuses = useMemo(() => [...new Set(pipelineProspects.map((p) => p['Current Status']))], [pipelineProspects]);
   const industries = useMemo(() => {
     const set = new Set();
