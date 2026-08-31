@@ -9,10 +9,17 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.102.8",
+    "@tanstack/react-router": "^1.170.32",
+    "@tanstack/react-table": "^8.21.3",
     "@vitejs/plugin-react": "latest",
-    "vite": "latest",
     "react": "latest",
-    "react-dom": "latest"
+    "react-dom": "latest",
+    "vite": "latest",
+    "zod": "^4.5.4"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "lighthouse": "^13.4.1",
+    "playwright": "^1.62.1"
+  }
 }

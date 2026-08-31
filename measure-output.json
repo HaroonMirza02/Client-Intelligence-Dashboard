@@ -1,0 +1,42 @@
+{
+  "url": "https://vision71-client-intelligence-tanstack.netlify.app/",
+  "timestamp": "2026-08-31T12:09:23.310Z",
+  "lighthouse": {
+    "runs": [
+      {
+        "lcp": 3298,
+        "fcp": 3298,
+        "ttfb": 444
+      },
+      {
+        "lcp": 3382.3155000000006,
+        "fcp": 3382.3155000000006,
+        "ttfb": 309
+      },
+      {
+        "lcp": 3428.585,
+        "fcp": 3428.585,
+        "ttfb": 487
+      }
+    ],
+    "medianLcpMs": 3382.3155000000006,
+    "medianInpMs": null
+  },
+  "network": {
+    "firstLoadCount": 10,
+    "filterChangeCount": 0,
+    "firstLoadUrls": [
+      "https://vision71-client-intelligence-tanstack.netlify.app/",
+      "https://vision71-client-intelligence-tanstack.netlify.app/assets/index-qY7x5Qvy.js",
+      "https://vision71-client-intelligence-tanstack.netlify.app/assets/index-DLyWXP-W.css",
+      "https://vision71-client-intelligence-tanstack.netlify.app/.netlify/scripts/hud?variant=public",
+      "https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap",
+      "https://vision71-client-intelligence-tanstack.netlify.app/api/sheet?name=Prospect%20Companies",
+      "https://vision71-client-intelligence-tanstack.netlify.app/api/sheet?name=Market%20Notes",
+      "https://vision71-client-intelligence-tanstack.netlify.app/api/sheet?name=Upwork%20Signals",
+      "https://fonts.gstatic.com/s/dmsans/v17/rP2Yp2ywxg089UriI5-g4vlH9VoD8Cmcqbu0-K4.woff2",
+      "https://fonts.gstatic.com/s/manrope/v20/xn7gYHE41ni1AdIRggexSg.woff2"
+    ],
+    "filterChangeUrls": []
+  }
+}
