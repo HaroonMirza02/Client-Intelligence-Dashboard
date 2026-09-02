@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './styles.css';
 
-const SHEETS = ['Prospect Companies', 'Market Notes', 'Upwork Signals'];
+const SHEETS = ['Prospect Companies', 'Market Notes', 'Upwork Signals', 'Monday Briefing'];
 
 function cellValue(cell) {
   return cell?.f ?? cell?.v ?? '';
@@ -70,6 +70,43 @@ function parseUpworkSignals(rows) {
   return { week, jobs, signals: patternRows.slice(0, 3).map((line) => line.replace(/^•\s*/, '')) };
 }
 
+function parseMondayBriefing(rows) {
+  // Find the header row containing 'Week Of'
+  const headerIndex = rows.findIndex((row) =>
+    row.some((c) => String(c).trim().toLowerCase() === 'week of')
+  );
+  if (headerIndex < 0) return null; // No header found — sheet is empty or unrecognised
+
+  const headers = rows[headerIndex].map((c) => String(c).trim());
+  const col = (name) => headers.findIndex((h) => h.toLowerCase() === name.toLowerCase());
+
+  const weekOfCol         = col('Week Of');
+  const headlineCol       = col('Headline');
+  const topProspectsCol   = col('Top Prospects');
+  const keySignalCol      = col('Key Market Signal');
+  const actionCol         = col('Recommended Action');
+
+  const dataRows = rows.slice(headerIndex + 1).filter(nonEmpty).map((row) => ({
+    weekOf:            row[weekOfCol]       || '',
+    headline:          row[headlineCol]     || '',
+    topProspects:      row[topProspectsCol] || '',
+    keyMarketSignal:   row[keySignalCol]    || '',
+    recommendedAction: row[actionCol]       || '',
+  })).filter((r) => r.weekOf || r.headline);
+
+  if (dataRows.length === 0) return null;
+
+  // Return only the most recent row by Week Of (lexicographic sort works for ISO dates;
+  // for human-readable dates we fall back to the last row in sheet order as a safe default).
+  const sorted = [...dataRows].sort((a, b) => {
+    const da = new Date(a.weekOf);
+    const db = new Date(b.weekOf);
+    if (!isNaN(da) && !isNaN(db)) return db - da;
+    return 0; // preserve original order, last item wins below
+  });
+  return sorted[0];
+}
+
 const label = (value) => value === '—' ? '' : value;
 const statusClass = (value) => `status ${String(value).toLowerCase().replace(/[^a-z]+/g, '-')}`;
 function getIndustries(industryStr) {
@@ -106,6 +143,36 @@ function getIndustries(industryStr) {
 
     return trimmed;
   }).filter((item) => item !== '' && item !== '—');
+}
+
+function MondayBriefing({ briefing }) {
+  if (!briefing) {
+    return (
+      <div className="briefing-empty">
+        <p>This week's briefing has not been published yet.</p>
+      </div>
+    );
+  }
+  return (
+    <div className="briefing-view">
+      <div className="briefing-week-label">Week of {briefing.weekOf}</div>
+      <h2 className="briefing-headline">{briefing.headline}</h2>
+      <div className="briefing-grid">
+        <article className="briefing-card">
+          <p className="eyebrow">TOP PROSPECTS</p>
+          <p className="briefing-card-body">{briefing.topProspects || '—'}</p>
+        </article>
+        <article className="briefing-card">
+          <p className="eyebrow">KEY MARKET SIGNAL</p>
+          <p className="briefing-card-body">{briefing.keyMarketSignal || '—'}</p>
+        </article>
+        <article className="briefing-card briefing-card--action">
+          <p className="eyebrow">RECOMMENDED ACTION</p>
+          <p className="briefing-card-body">{briefing.recommendedAction || '—'}</p>
+        </article>
+      </div>
+    </div>
+  );
 }
 
 function ManagerInsights({
@@ -296,7 +363,7 @@ function App() {
     setLoading(true); setError('');
     try {
       const raw = await Promise.all(SHEETS.map(fetchSheet));
-      setData({ prospects: parseProspects(raw[0]), notes: parseMarketNotes(raw[1]), upwork: parseUpworkSignals(raw[2]) });
+      setData({ prospects: parseProspects(raw[0]), notes: parseMarketNotes(raw[1]), upwork: parseUpworkSignals(raw[2]), briefing: parseMondayBriefing(raw[3]) });
       setLastUpdated(new Date());
     } catch (err) { setError(err.message || 'Refresh failed. Please try again.'); }
     finally { setLoading(false); }
@@ -454,6 +521,12 @@ function App() {
       >
         Manager Insights
       </button>
+      <button
+        className={`tab-button ${activeTab === 'briefing' ? 'active' : ''}`}
+        onClick={() => setActiveTab('briefing')}
+      >
+        Monday Briefing
+      </button>
     </div>
 
     {activeTab === 'pipeline' ? (
@@ -463,7 +536,7 @@ function App() {
           <article className="panel market"><div className="panel-heading"><div><p className="eyebrow">MARKET NOTES</p><h2>Competitive context</h2></div><span>{data?.notes.length || 0} notes</span></div>{data?.notes.length ? <ul className="notes">{data.notes.map((note, i) => <li key={i}><b>{note.category || 'Market note'}</b><span>{note.note}</span>{note.source && <small>{note.source}</small>}</li>)}</ul> : <p className="empty">No market notes have been logged yet. Add them to the live workbook and refresh here.</p>}</article></section>
         <section className="table-panel"><div className="table-head"><div><p className="eyebrow">PROSPECT COMPANIES</p><h2>Pipeline</h2></div><span>{visible.length} of {prospects.length} records shown · {pipelineProspects.length} active prospects</span></div><div className="filters"><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search companies, notes, or sources" aria-label="Search prospects" /><select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} aria-label="Filter by status"><option>All statuses</option>{statuses.map((item) => <option key={item}>{item}</option>)}</select><select value={industryFilter} onChange={(e) => setIndustryFilter(e.target.value)} aria-label="Filter by industry"><option>All industries</option>{industries.map((item) => <option key={item}>{item}</option>)}</select></div><div className="table-wrap"><table><thead><tr>{['Company Name', 'Industry', 'Size (rough)', 'Source', 'Current Status', 'Last Touched', 'Notes'].map((item) => <th key={item}>{item}</th>)}</tr></thead><tbody>{visible.map((p) => <tr key={p['Company Name']}><td className="company">{p['Company Name']}</td><td>{p.Industry}</td><td>{p['Size (rough)']}</td><td>{p.Source}</td><td><span className={statusClass(p['Current Status'])}>{p['Current Status']}</span></td><td>{label(p['Last Touched']) || '—'}</td><td className="notes-cell">{p.Notes}</td></tr>)}</tbody></table>{!loading && !visible.length && <p className="empty table-empty">No prospects match these filters.</p>}</div></section>
       </>
-    ) : (
+    ) : activeTab === 'insights' ? (
       <ManagerInsights
         pipelineProspects={pipelineProspects}
         funnelStages={funnelStages}
@@ -472,6 +545,8 @@ function App() {
         sizeDistribution={sizeDistribution}
         executiveInsights={executiveInsights}
       />
+    ) : (
+      <MondayBriefing briefing={data?.briefing ?? null} />
     )}
   </main>;
 }

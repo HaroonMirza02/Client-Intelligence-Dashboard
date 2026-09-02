@@ -1,5 +1,5 @@
 const SHEET_ID = '1-SGEvxRXLOolU0Pud7pIvDK6_aJVKo9VuM9FahaFM78';
-const ALLOWED_SHEETS = new Set(['Prospect Companies', 'Market Notes', 'Upwork Signals']);
+const ALLOWED_SHEETS = new Set(['Prospect Companies', 'Market Notes', 'Upwork Signals', 'Monday Briefing']);
 
 export default async (request) => {
   const name = new URL(request.url).searchParams.get('name');

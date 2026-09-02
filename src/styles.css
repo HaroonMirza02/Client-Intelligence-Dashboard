@@ -296,3 +296,76 @@
   }
 }
 
+
+/* Monday Briefing View */
+.briefing-view {
+  max-width: 860px;
+}
+.briefing-week-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #1661c8;
+  margin-bottom: 10px;
+}
+.briefing-headline {
+  font-family: Manrope, sans-serif;
+  font-size: 1.65rem;
+  font-weight: 800;
+  color: #11213c;
+  letter-spacing: -0.04em;
+  margin: 0 0 28px;
+  line-height: 1.25;
+}
+.briefing-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.briefing-card {
+  background: #fff;
+  border: 1px solid #e5eaf2;
+  border-radius: 10px;
+  padding: 20px 22px;
+  box-shadow: 0 2px 5px #29385808;
+}
+.briefing-card .eyebrow {
+  margin-bottom: 10px;
+}
+.briefing-card-body {
+  font-size: 0.92rem;
+  color: #334155;
+  line-height: 1.6;
+  margin: 0;
+}
+/* Recommended Action spans full width and gets a left accent */
+.briefing-card--action {
+  grid-column: 1 / -1;
+  border-left: 4px solid #1661c8;
+  background: #f0f6ff;
+}
+.briefing-card--action .briefing-card-body {
+  color: #1e3a5f;
+  font-weight: 500;
+}
+/* Empty state */
+.briefing-empty {
+  background: #fff;
+  border: 1px solid #e5eaf2;
+  border-radius: 10px;
+  padding: 48px 32px;
+  text-align: center;
+  color: #64748b;
+  font-size: 0.95rem;
+  box-shadow: 0 2px 5px #29385808;
+  max-width: 520px;
+}
+@media(max-width: 600px) {
+  .briefing-grid {
+    grid-template-columns: 1fr;
+  }
+  .briefing-card--action {
+    grid-column: 1;
+  }
+}
