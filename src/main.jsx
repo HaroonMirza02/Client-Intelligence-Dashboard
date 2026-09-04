@@ -405,7 +405,13 @@ function App() {
     finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { refresh(); }, [refresh]);
+  useEffect(() => {
+    refresh();
+    // Silent background poll every 5 minutes so the dashboard stays current
+    // without Ali needing to click anything or reload the page.
+    const timer = setInterval(refresh, 5 * 60 * 1000);
+    return () => clearInterval(timer);
+  }, [refresh]);
   const prospects = data?.prospects || [];
   const pipelineProspects = prospects;
   const statuses = useMemo(() => [...new Set(pipelineProspects.map((p) => p['Current Status']))], [pipelineProspects]);
