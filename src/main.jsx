@@ -12,7 +12,15 @@ async function fetchSheet(name) {
   const response = await fetch(`/api/sheet?name=${encodeURIComponent(name)}`);
   if (!response.ok) throw new Error(`${name} could not be loaded (${response.status}).`);
   const payload = await response.json();
-  return payload.table.rows.map((row) => (row.c || []).map(cellValue));
+  const rows = payload.table.rows.map((row) => (row.c || []).map(cellValue));
+  // cols carries the column labels Google may have auto-promoted out of row 1 when it
+  // detects a typed column (e.g. a date column). Empty-label trailing cols are stripped.
+  const cols = (payload.table.cols || []).map((c) => String(c.label || '').trim()).filter((_, i, arr) => {
+    // Keep all cols up to and including the last one with a non-empty label
+    const lastNonEmpty = arr.reduce((acc, label, idx) => (label ? idx : acc), -1);
+    return i <= lastNonEmpty;
+  });
+  return { rows, cols };
 }
 
 function nonEmpty(row) { return row.some((item) => String(item).trim()); }
@@ -70,39 +78,62 @@ function parseUpworkSignals(rows) {
   return { week, jobs, signals: patternRows.slice(0, 3).map((line) => line.replace(/^•\s*/, '')) };
 }
 
-function parseMondayBriefing(rows) {
-  // Find the header row containing 'Week Of'
+function parseMondayBriefing({ rows, cols }) {
+  // Helper: given a headers array and a data-rows array, map to briefing objects.
+  function mapRows(headers, dataRows) {
+    const col = (name) =>
+      headers.findIndex((h) => String(h).trim().toLowerCase() === name.toLowerCase());
+
+    const weekOfCol         = col('Week Of');
+    const headlineCol       = col('Headline');
+    const topProspectsCol   = col('Top Prospects');
+    const keySignalCol      = col('Key Market Signal');
+    const actionCol         = col('Recommended Action');
+
+    return dataRows.filter(nonEmpty).map((row) => ({
+      weekOf:            row[weekOfCol]       || '',
+      headline:          row[headlineCol]     || '',
+      topProspects:      row[topProspectsCol] || '',
+      keyMarketSignal:   row[keySignalCol]    || '',
+      recommendedAction: row[actionCol]       || '',
+    })).filter((r) => r.weekOf || r.headline);
+  }
+
+  // --- PATH A: header row is inside rows (Google did not auto-detect a header) ---
+  // This is the original behaviour and must keep working if Google ever stops
+  // auto-promoting the header for this sheet.
   const headerIndex = rows.findIndex((row) =>
     row.some((c) => String(c).trim().toLowerCase() === 'week of')
   );
-  if (headerIndex < 0) return null; // No header found — sheet is empty or unrecognised
 
-  const headers = rows[headerIndex].map((c) => String(c).trim());
-  const col = (name) => headers.findIndex((h) => h.toLowerCase() === name.toLowerCase());
+  let dataRows;
+  let headers;
 
-  const weekOfCol         = col('Week Of');
-  const headlineCol       = col('Headline');
-  const topProspectsCol   = col('Top Prospects');
-  const keySignalCol      = col('Key Market Signal');
-  const actionCol         = col('Recommended Action');
+  if (headerIndex >= 0) {
+    headers = rows[headerIndex];
+    dataRows = rows.slice(headerIndex + 1);
+  } else if (cols && cols.some((c) => String(c).trim().toLowerCase() === 'week of')) {
+    // --- PATH B: Google auto-promoted the header into table.cols ---
+    // The date type on Week Of triggers Google's header detection; the header labels
+    // are already in cols and rows contains only real data rows.
+    headers = cols;
+    dataRows = rows;
+  } else {
+    // Neither path found a recognisable header — sheet is empty or not yet set up.
+    return null;
+  }
 
-  const dataRows = rows.slice(headerIndex + 1).filter(nonEmpty).map((row) => ({
-    weekOf:            row[weekOfCol]       || '',
-    headline:          row[headlineCol]     || '',
-    topProspects:      row[topProspectsCol] || '',
-    keyMarketSignal:   row[keySignalCol]    || '',
-    recommendedAction: row[actionCol]       || '',
-  })).filter((r) => r.weekOf || r.headline);
+  const mapped = mapRows(headers, dataRows);
+  if (mapped.length === 0) return null;
 
-  if (dataRows.length === 0) return null;
-
-  // Return only the most recent row by Week Of (lexicographic sort works for ISO dates;
-  // for human-readable dates we fall back to the last row in sheet order as a safe default).
-  const sorted = [...dataRows].sort((a, b) => {
+  // Return only the most recent row by Week Of.
+  // cellValue already applied .f (formatted string) over .v, so weekOf may be
+  // a formatted date string like "9-3-26". Try Date parsing; fall back to last row.
+  const sorted = [...mapped].sort((a, b) => {
     const da = new Date(a.weekOf);
     const db = new Date(b.weekOf);
     if (!isNaN(da) && !isNaN(db)) return db - da;
-    return 0; // preserve original order, last item wins below
+    return 0;
   });
   return sorted[0];
 }
@@ -363,7 +394,12 @@ function App() {
     setLoading(true); setError('');
     try {
       const raw = await Promise.all(SHEETS.map(fetchSheet));
-      setData({ prospects: parseProspects(raw[0]), notes: parseMarketNotes(raw[1]), upwork: parseUpworkSignals(raw[2]), briefing: parseMondayBriefing(raw[3]) });
+      setData({
+        prospects:  parseProspects(raw[0].rows),
+        notes:      parseMarketNotes(raw[1].rows),
+        upwork:     parseUpworkSignals(raw[2].rows),
+        briefing:   parseMondayBriefing(raw[3]),
+      });
       setLastUpdated(new Date());
     } catch (err) { setError(err.message || 'Refresh failed. Please try again.'); }
     finally { setLoading(false); }
