@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './styles.css';
+import UpworkDashboard from './UpworkDashboard';
 
+const JobDataset = lazy(() => import('./JobDataset'));
 const SHEETS = ['Prospect Companies', 'Market Notes', 'Upwork Signals', 'Monday Briefing'];
 
 function cellValue(cell) {
@@ -12,6 +14,7 @@ async function fetchSheet(name) {
   const response = await fetch(`/api/sheet?name=${encodeURIComponent(name)}`);
   if (!response.ok) throw new Error(`${name} could not be loaded (${response.status}).`);
   const payload = await response.json();
+  if (!payload.table?.rows) throw new Error(payload.error || `${name} returned no worksheet data.`);
   const rows = payload.table.rows.map((row) => (row.c || []).map(cellValue));
   // cols carries the column labels Google may have auto-promoted out of row 1 when it
   // detects a typed column (e.g. a date column). Empty-label trailing cols are stripped.
@@ -388,7 +391,7 @@ function App() {
   const [statusFilter, setStatusFilter] = useState('All statuses');
   const [industryFilter, setIndustryFilter] = useState('All industries');
   const [query, setQuery] = useState('');
-  const [activeTab, setActiveTab] = useState('pipeline');
+  const [activeTab, setActiveTab] = useState('upwork');
 
   const refresh = useCallback(async () => {
     setLoading(true); setError('');
@@ -398,6 +401,7 @@ function App() {
         prospects:  parseProspects(raw[0].rows),
         notes:      parseMarketNotes(raw[1].rows),
         upwork:     parseUpworkSignals(raw[2].rows),
+        upworkSheet: raw[2],
         briefing:   parseMondayBriefing(raw[3]),
       });
       setLastUpdated(new Date());
@@ -547,16 +551,21 @@ function App() {
   }, [pipelineProspects, topSources, topIndustries]);
 
   return <main className="shell">
-    <header className="topbar"><div><p className="eyebrow">VISION71 TECHNOLOGIES</p><h1>Sales intelligence</h1><p className="subhead">A live view of the prospect pipeline and market signals.</p></div><div className="refresh-area"><span>{lastUpdated ? `Updated ${lastUpdated.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}` : 'Loading live workbook…'}</span><button onClick={refresh} disabled={loading}>{loading ? 'Refreshing…' : '↻ Refresh data'}</button></div></header>
+    <header className="topbar"><div><p className="eyebrow">VISION71 TECHNOLOGIES</p><h1>Sales intelligence</h1><p className="subhead">Market demand. Delivery focus. Informed decisions.</p></div><div className="refresh-area"><span>{lastUpdated ? `Updated ${lastUpdated.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}` : loading ? 'Loading live workbook…' : 'Workbook unavailable'}</span><button onClick={refresh} disabled={loading}>{loading ? 'Refreshing…' : '↻ Refresh data'}</button></div></header>
     {error && <div className="error" role="alert">{error} {data && 'Showing the last successful data set.'}</div>}
 
     <div className="tab-navigation">
+      <button className={`tab-button ${activeTab === 'upwork' ? 'active' : ''}`} onClick={() => setActiveTab('upwork')}>Upwork Intelligence</button>
+      <button className={`tab-button ${activeTab === 'market' ? 'active' : ''}`} onClick={() => setActiveTab('market')}>Market Insights</button>
+      <button className={`tab-button ${activeTab === 'jobs' ? 'active' : ''}`} onClick={() => setActiveTab('jobs')}>Upwork Job Data</button>
+      {/* Prospect List is temporarily hidden. Restore this button to re-enable it.
       <button
         className={`tab-button ${activeTab === 'pipeline' ? 'active' : ''}`}
         onClick={() => setActiveTab('pipeline')}
       >
         Prospect List
       </button>
+      */}
       <button
         className={`tab-button ${activeTab === 'insights' ? 'active' : ''}`}
         onClick={() => setActiveTab('insights')}
@@ -571,7 +580,7 @@ function App() {
       </button>
     </div>
 
-    {activeTab === 'pipeline' ? (
+    {activeTab === 'jobs' ? <Suspense fallback={<p role="status">Loading job data…</p>}><JobDataset /></Suspense> : activeTab === 'upwork' || activeTab === 'market' ? <UpworkDashboard sheet={data?.upworkSheet} loading={loading} view={activeTab === 'market' ? 'market' : 'overview'} /> : activeTab === 'pipeline' ? (
       <>
         <section className="summary" aria-label="Pipeline summary"><div className="total-card"><span>Active prospects</span><strong>{pipelineProspects.length}</strong></div>{pipeline.map(({ status, count }) => <div className="stat-card" key={status}><span className={statusClass(status)}>{status}</span><strong>{count}</strong></div>)}</section>
         <section className="insights-grid"><article className="panel upwork"><div className="panel-heading"><div><p className="eyebrow">UPWORK MARKET SIGNALS</p><h2>{data?.upwork.week || 'Loading latest signals…'}</h2></div>{data?.upwork.jobs && <span className="jobs">{data.upwork.jobs} jobs analyzed</span>}</div><ul>{data?.upwork.signals.map((signal) => <li key={signal}>{signal}</li>)}</ul>{data && !data.upwork.signals.length && <p className="empty">No notable signals are available in the latest workbook update.</p>}</article>
@@ -593,3 +602,4 @@ function App() {
   </main>;
 }
 createRoot(document.getElementById('root')).render(<App />);
+

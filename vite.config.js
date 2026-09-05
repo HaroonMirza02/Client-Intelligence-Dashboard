@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 
 const SHEET_ID = '1-SGEvxRXLOolU0Pud7pIvDK6_aJVKo9VuM9FahaFM78';
-const allowed = new Set(['Prospect Companies', 'Market Notes', 'Upwork Signals']);
+const allowed = new Set(['Prospect Companies', 'Market Notes', 'Upwork Signals', 'Monday Briefing']);
 
 export default defineConfig({
   plugins: [{
