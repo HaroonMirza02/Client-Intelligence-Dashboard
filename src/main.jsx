@@ -566,12 +566,14 @@ function App() {
         Prospect List
       </button>
       */}
+      {/* Manager Insights is temporarily hidden; restore this button to re-enable it.
       <button
         className={`tab-button ${activeTab === 'insights' ? 'active' : ''}`}
         onClick={() => setActiveTab('insights')}
       >
         Manager Insights
       </button>
+      */}
       <button
         className={`tab-button ${activeTab === 'briefing' ? 'active' : ''}`}
         onClick={() => setActiveTab('briefing')}
