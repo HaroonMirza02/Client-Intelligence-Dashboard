@@ -433,26 +433,28 @@ function App() {
 
   // parseError is set when hasData is true but a parse function throws —
   // i.e. the sheet was reachable but returned unexpected/malformed content.
-  const [parseError, setParseError] = useState(null);
-
-  const data = useMemo(() => {
-    if (!hasData) return null;
+  // Returned from the same memo as data so no state setter is needed —
+  // calling setState inside useMemo causes an infinite re-render loop (#301).
+  const { data, parseError } = useMemo(() => {
+    if (!hasData) return { data: null, parseError: null };
     try {
       const [prospectsRaw, notesRaw, upworkRaw] = sheetQueries.map((q) => q.data);
-      const result = {
-        prospects: parseProspects(prospectsRaw),
-        notes: parseMarketNotes(notesRaw),
-        upwork: parseUpworkSignals(upworkRaw),
+      return {
+        data: {
+          prospects: parseProspects(prospectsRaw),
+          notes: parseMarketNotes(notesRaw),
+          upwork: parseUpworkSignals(upworkRaw),
+        },
+        parseError: null,
       };
-      // Clear any previous parse error now that parsing succeeded.
-      setParseError(null);
-      return result;
     } catch (err) {
       // Do not let the throw escape into the render phase.
-      // Store it so the existing error banner can display it,
-      // and return null so the rest of the UI degrades safely.
-      setParseError(err instanceof Error ? err : new Error(String(err)));
-      return null;
+      // Return null for data so the rest of the UI degrades safely,
+      // and surface the error through the existing error banner.
+      return {
+        data: null,
+        parseError: err instanceof Error ? err : new Error(String(err)),
+      };
     }
   }, [hasData, sheetQueries]);
 
