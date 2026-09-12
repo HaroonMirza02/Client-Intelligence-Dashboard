@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, Component } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   QueryClient,
@@ -425,21 +425,40 @@ function App() {
 
   const loading = sheetQueries.some((q) => q.isFetching);
   const isInitialLoading = sheetQueries.some((q) => q.isLoading);
-  const error = sheetQueries.find((q) => q.error)?.error;
+  const networkError = sheetQueries.find((q) => q.error)?.error;
   const hasData = sheetQueries.every((q) => q.data);
 
   const dataUpdatedAt = Math.max(...sheetQueries.map((q) => q.dataUpdatedAt || 0));
   const lastUpdated = dataUpdatedAt ? new Date(dataUpdatedAt) : null;
 
+  // parseError is set when hasData is true but a parse function throws —
+  // i.e. the sheet was reachable but returned unexpected/malformed content.
+  const [parseError, setParseError] = useState(null);
+
   const data = useMemo(() => {
     if (!hasData) return null;
-    const [prospectsRaw, notesRaw, upworkRaw] = sheetQueries.map((q) => q.data);
-    return {
-      prospects: parseProspects(prospectsRaw),
-      notes: parseMarketNotes(notesRaw),
-      upwork: parseUpworkSignals(upworkRaw),
-    };
+    try {
+      const [prospectsRaw, notesRaw, upworkRaw] = sheetQueries.map((q) => q.data);
+      const result = {
+        prospects: parseProspects(prospectsRaw),
+        notes: parseMarketNotes(notesRaw),
+        upwork: parseUpworkSignals(upworkRaw),
+      };
+      // Clear any previous parse error now that parsing succeeded.
+      setParseError(null);
+      return result;
+    } catch (err) {
+      // Do not let the throw escape into the render phase.
+      // Store it so the existing error banner can display it,
+      // and return null so the rest of the UI degrades safely.
+      setParseError(err instanceof Error ? err : new Error(String(err)));
+      return null;
+    }
   }, [hasData, sheetQueries]);
+
+  // Merge network error and parse error into one value.
+  // Network error takes priority since it is the root cause when both exist.
+  const error = networkError ?? parseError;
 
   const refresh = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['sheet'] });
@@ -623,10 +642,46 @@ function App() {
   </main>;
 }
 
+// Catches any render-phase throw that escapes the app tree — defense in depth
+// so an unforeseen throw in any future component also degrades gracefully.
+class ErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+
+  static getDerivedStateFromError(err) {
+    return { error: err };
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <main className="shell">
+          <header className="topbar">
+            <div>
+              <p className="eyebrow">VISION71 TECHNOLOGIES</p>
+              <h1>Sales intelligence</h1>
+            </div>
+          </header>
+          <div className="error" role="alert">
+            An unexpected error occurred and the dashboard could not render.
+            {' '}{this.state.error.message || String(this.state.error)}
+            {' '}Please reload the page. If the problem persists, check the sheet data.
+          </div>
+        </main>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 const queryClient = new QueryClient();
 
 createRoot(document.getElementById('root')).render(
-  <QueryClientProvider client={queryClient}>
-    <RouterProvider router={router} />
-  </QueryClientProvider>
+  <ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>
+  </ErrorBoundary>
 );
